@@ -2,6 +2,7 @@
 
 A Gymnasium environment for the Bloxorz puzzle game, where a rectangular block must be rolled onto a goal tile.
 
+This version is a 2d version of the original game, with only randomly generated levels. There is also a lot of the more advanced mechanics that are not implemented yet.
 ## Installation
 
 ```bash
