@@ -30,7 +30,7 @@ class BloxorzEnv(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 60}
 
     def __init__(self, grid_cols=18, grid_rows=14, gate=True, render_mode=None,
-                 path_length=40, branch_tiles=40):
+                 path_length=40, branch_tiles=40, max_steps=500):
         super().__init__()
         self.grid_cols = grid_cols
         self.grid_rows = grid_rows
@@ -38,6 +38,7 @@ class BloxorzEnv(gym.Env):
         self.render_mode = render_mode
         self.path_length = path_length
         self.branch_tiles = branch_tiles
+        self.max_steps = max_steps
 
         self._img_w = MARGIN * 2 + (grid_cols + 2 * BOARD_PAD) * TILE_SIZE
         self._img_h = MARGIN * 2 + (grid_rows + 2 * BOARD_PAD) * TILE_SIZE
@@ -55,7 +56,8 @@ class BloxorzEnv(gym.Env):
         self._ori: int = UPRIGHT
         self._switch_cell: tuple[int, int] | None = None
         self._gate_open: bool = False
-        self._fallen: bool = False
+        self._done: bool = False
+        self._steps: int = 0
 
         self._display_surface = None
         self._display_clock = None
@@ -73,7 +75,8 @@ class BloxorzEnv(gym.Env):
         self._col, self._row, self._ori = sc, sr, so
         self._switch_cell = switch_cell
         self._gate_open = False
-        self._fallen = False
+        self._done = False
+        self._steps = 0
 
         obs = self._obs()
         if self.render_mode == "human":
@@ -81,13 +84,12 @@ class BloxorzEnv(gym.Env):
         return obs, {}
 
     def step(self, action):
-        assert not self._fallen, "Episode is done; call reset()."
+        assert not self._done, "Episode is done; call reset()."
 
         direction = ACTIONS[action]
         nc, nr, no = move(self._col, self._row, self._ori, direction)
 
         if not is_valid(nc, nr, no, self._board, self._gate_open):
-            self._fallen = True
             reward = REWARDS["fall"]
             terminated = True
         else:
@@ -106,10 +108,18 @@ class BloxorzEnv(gym.Env):
                 reward = REWARDS["step"] + gate_reward
                 terminated = False
 
+        self._steps += 1
+        truncated = (not terminated) and (self._steps >= self.max_steps)
+        self._done = terminated or truncated
+
+        info = {}
+        if self._done:
+            info["final_info"] = {"solved": terminated and reward == REWARDS["win"]}
+
         obs = self._obs()
         if self.render_mode == "human":
             self._render_human(obs)
-        return obs, reward, terminated, False, {}
+        return obs, reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "human":
