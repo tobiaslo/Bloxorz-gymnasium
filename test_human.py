@@ -29,7 +29,7 @@ def obs_to_surface(obs: np.ndarray) -> pygame.Surface:
 
 
 def main():
-    env = gym.make("Bloxorz-v0", render_mode=None)
+    env = gym.make("Bloxorz-NoGate-v0", render_mode=None)
     obs, _ = env.reset()
 
     img_h, img_w = obs.shape[:2]

@@ -27,7 +27,7 @@ REWARDS = {
 
 
 class BloxorzEnv(gym.Env):
-    metadata = {"render_modes": ["human", "ansi"], "render_fps": 60}
+    metadata = {"render_modes": ["human", "ansi", "rgb_array"], "render_fps": 60}
 
     def __init__(self, grid_cols=18, grid_rows=14, gate=True, render_mode=None,
                  path_length=40, branch_tiles=40, max_steps=500):
@@ -126,6 +126,8 @@ class BloxorzEnv(gym.Env):
             self._render_human(self._obs())
         elif self.render_mode == "ansi":
             return self._render_ansi()
+        elif self.render_mode == "rgb_array":
+            return self._obs()
 
     def close(self):
         if self._display_surface is not None:
