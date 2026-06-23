@@ -19,8 +19,8 @@ gym.register(
     entry_point="bloxorz.env:BloxorzEnv",
     max_episode_steps=100,
     kwargs={
-        "grid_cols": 12,
-        "grid_rows": 8,
+        "grid_cols": 10,
+        "grid_rows": 10,
         "gate": False,
         "path_length": 40,
         "branch_tiles": 20,

@@ -4,13 +4,13 @@ import argparse
 import numpy as np
 
 # --- Constants ---
-TILE_SIZE = 60
-MARGIN = 40
+TILE_SIZE = 8
+MARGIN = 0
 FPS = 60
 
 COLOR_BG = (30, 30, 30)
-COLOR_TILE = (120, 120, 130)
-COLOR_TILE_BORDER = (90, 90, 100)
+COLOR_TILE = (150, 150, 160)
+COLOR_TILE_BORDER = (115, 115, 125)
 COLOR_GOAL = (60, 160, 80)
 COLOR_GOAL_BORDER = (40, 120, 60)
 COLOR_BLOCK = (220, 100, 40)
@@ -26,7 +26,7 @@ COLOR_GATE_CLOSED_BORDER = (100, 20, 20)
 COLOR_GATE_OPEN = (80, 160, 200)
 COLOR_GATE_OPEN_BORDER = (50, 110, 150)
 
-BOARD_PAD = 2  # void-tile border around the playable area on each side
+BOARD_PAD = 1  # void-tile border around the playable area on each side
 
 # Orientations
 UPRIGHT = 0

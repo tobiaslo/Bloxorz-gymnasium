@@ -9,9 +9,8 @@ from .core import (
     COLOR_BG, COLOR_TEXT,
     COLOR_TILE, COLOR_TILE_BORDER,
     COLOR_GOAL, COLOR_GOAL_BORDER,
-    COLOR_GATE_OPEN, COLOR_GATE_OPEN_BORDER,
-    COLOR_GATE_CLOSED, COLOR_GATE_CLOSED_BORDER,
-    COLOR_SWITCH, COLOR_SWITCH_BORDER,
+    COLOR_GATE_OPEN, COLOR_GATE_CLOSED,
+    COLOR_SWITCH,
     COLOR_BLOCK, COLOR_BLOCK_BORDER,
 )
 
@@ -155,33 +154,21 @@ class BloxorzEnv(gym.Env):
                 if cell == 0:
                     continue
                 if cell == 3:
-                    fill, border = (
-                        (COLOR_GATE_OPEN, COLOR_GATE_OPEN_BORDER)
-                        if self._gate_open
-                        else (COLOR_GATE_CLOSED, COLOR_GATE_CLOSED_BORDER)
-                    )
+                    fill = COLOR_GATE_OPEN if self._gate_open else COLOR_GATE_CLOSED
                 elif cell == 4:
-                    fill, border = (
-                        ((80, 220, 80), (40, 160, 40))
-                        if self._gate_open
-                        else (COLOR_SWITCH, COLOR_SWITCH_BORDER)
-                    )
+                    fill = (80, 220, 80) if self._gate_open else COLOR_SWITCH
                 else:
-                    fill, border = self._CELL_COLORS[cell]
+                    fill = self._CELL_COLORS[cell][0]
                 x = MARGIN + c * T
                 y = MARGIN + r * T
-                img[y+2:y+T-2, x+2:x+T-2] = fill
-                img[y+2:y+4,   x+2:x+T-2] = border
-                img[y+T-4:y+T-2, x+2:x+T-2] = border
-                img[y+2:y+T-2, x+2:x+4]   = border
-                img[y+2:y+T-2, x+T-4:x+T-2] = border
+                img[y+1:y+T-1, x+1:x+T-1] = fill
 
         cells = occupied_cells(self._col, self._row, self._ori)
         min_c = min(c for c, _ in cells)
         min_r = min(r for _, r in cells)
         max_c = max(c for c, _ in cells)
         max_r = max(r for _, r in cells)
-        pad = 6
+        pad = 1
         bx = MARGIN + min_c * T + pad
         by = MARGIN + min_r * T + pad
         bw = (max_c - min_c + 1) * T - pad * 2
