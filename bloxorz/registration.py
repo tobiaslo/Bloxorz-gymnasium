@@ -22,8 +22,25 @@ gym.register(
         "grid_cols": 10,
         "grid_rows": 10,
         "gate": False,
-        "path_length": 40,
+        "path_length": 30,
         "branch_tiles": 20,
+        "render_mode": None,
+    },
+)
+
+# Same as Bloxorz-NoGate-v0, but invalid moves (off-board / void) keep the
+# block in place and apply the fall penalty instead of ending the episode.
+gym.register(
+    id="Bloxorz-NoFall-v0",
+    entry_point="bloxorz.env:BloxorzEnv",
+    max_episode_steps=100,
+    kwargs={
+        "grid_cols": 10,
+        "grid_rows": 10,
+        "gate": False,
+        "path_length": 30,
+        "branch_tiles": 50,
+        "fall_terminates": False,
         "render_mode": None,
     },
 )

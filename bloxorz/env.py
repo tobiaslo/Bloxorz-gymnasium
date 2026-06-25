@@ -29,7 +29,8 @@ class BloxorzEnv(gym.Env):
     metadata = {"render_modes": ["human", "ansi", "rgb_array"], "render_fps": 60}
 
     def __init__(self, grid_cols=18, grid_rows=14, gate=True, render_mode=None,
-                 path_length=40, branch_tiles=40, max_steps=500):
+                 path_length=40, branch_tiles=40, max_steps=500,
+                 fall_terminates=True):
         super().__init__()
         self.grid_cols = grid_cols
         self.grid_rows = grid_rows
@@ -38,6 +39,10 @@ class BloxorzEnv(gym.Env):
         self.path_length = path_length
         self.branch_tiles = branch_tiles
         self.max_steps = max_steps
+        # When False, an invalid move (off-board / onto void / into a closed
+        # gate) does not end the episode: the block stays put and the fall
+        # reward is applied as a penalty instead.
+        self.fall_terminates = fall_terminates
 
         self._img_w = MARGIN * 2 + (grid_cols + 2 * BOARD_PAD) * TILE_SIZE
         self._img_h = MARGIN * 2 + (grid_rows + 2 * BOARD_PAD) * TILE_SIZE
@@ -90,7 +95,8 @@ class BloxorzEnv(gym.Env):
 
         if not is_valid(nc, nr, no, self._board, self._gate_open):
             reward = REWARDS["fall"]
-            terminated = True
+            # fall_terminates=False: block stays put, episode continues.
+            terminated = self.fall_terminates
         else:
             self._col, self._row, self._ori = nc, nr, no
 

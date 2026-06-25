@@ -29,7 +29,7 @@ def obs_to_surface(obs: np.ndarray) -> pygame.Surface:
 
 
 def main():
-    env = gym.make("Bloxorz-NoGate-v0", render_mode=None)
+    env = gym.make("Bloxorz-NoFall-v0", render_mode=None)
     obs, _ = env.reset()
 
     img_h, img_w = obs.shape[:2]
@@ -73,6 +73,7 @@ def main():
                     obs, reward, terminated, _, _ = env.step(action)
                     steps += 1
                     total_reward += float(reward)
+                    print(f"step {steps}: reward={float(reward):+.2f}   total={total_reward:.2f}")
                     if terminated:
                         won = reward > 0
                         fallen = not won
