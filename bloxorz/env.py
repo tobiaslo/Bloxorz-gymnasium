@@ -16,6 +16,8 @@ from .core import (
 
 ACTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1)]  # right, left, down, up
 
+# Default reward values. Any subset can be overridden per-env via the
+# `rewards` constructor argument.
 REWARDS = {
     "win":          1.0,
     "fall":        -1.0,
@@ -30,7 +32,7 @@ class BloxorzEnv(gym.Env):
 
     def __init__(self, grid_cols=18, grid_rows=14, gate=True, render_mode=None,
                  path_length=40, branch_tiles=40, max_steps=500,
-                 fall_terminates=True):
+                 fall_terminates=True, rewards=None):
         super().__init__()
         self.grid_cols = grid_cols
         self.grid_rows = grid_rows
@@ -43,6 +45,8 @@ class BloxorzEnv(gym.Env):
         # gate) does not end the episode: the block stays put and the fall
         # reward is applied as a penalty instead.
         self.fall_terminates = fall_terminates
+        # Per-env reward overrides merged over the module defaults.
+        self.rewards = {**REWARDS, **(rewards or {})}
 
         self._img_w = MARGIN * 2 + (grid_cols + 2 * BOARD_PAD) * TILE_SIZE
         self._img_h = MARGIN * 2 + (grid_rows + 2 * BOARD_PAD) * TILE_SIZE
@@ -94,7 +98,7 @@ class BloxorzEnv(gym.Env):
         nc, nr, no = move(self._col, self._row, self._ori, direction)
 
         if not is_valid(nc, nr, no, self._board, self._gate_open):
-            reward = REWARDS["fall"]
+            reward = self.rewards["fall"]
             # fall_terminates=False: block stays put, episode continues.
             terminated = self.fall_terminates
         else:
@@ -104,13 +108,13 @@ class BloxorzEnv(gym.Env):
             if (self._switch_cell and self._ori == UPRIGHT
                     and (self._col, self._row) == self._switch_cell):
                 self._gate_open = not self._gate_open
-                gate_reward = REWARDS["gate_open"] if self._gate_open else REWARDS["gate_close"]
+                gate_reward = self.rewards["gate_open"] if self._gate_open else self.rewards["gate_close"]
 
             if is_win(self._col, self._row, self._ori, self._board):
-                reward = REWARDS["win"]
+                reward = self.rewards["win"]
                 terminated = True
             else:
-                reward = REWARDS["step"] + gate_reward
+                reward = self.rewards["step"] + gate_reward
                 terminated = False
 
         self._steps += 1
@@ -119,7 +123,7 @@ class BloxorzEnv(gym.Env):
 
         info = {}
         if self._done:
-            info["final_info"] = {"solved": terminated and reward == REWARDS["win"]}
+            info["final_info"] = {"solved": terminated and reward == self.rewards["win"]}
 
         obs = self._obs()
         if self.render_mode == "human":

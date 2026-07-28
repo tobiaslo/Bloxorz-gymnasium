@@ -53,7 +53,7 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 
 - **Action space:** `Discrete(4)` — `0=right, 1=left, 2=down, 3=up` (`ACTIONS` list).
 - **Observation space:** `Box(0,255, (H, W, 3), uint8)` RGB image, drawn in `_obs()` with NumPy slicing (no pygame surface needed). Image size derives from grid + `BOARD_PAD` + `MARGIN`.
-- **Rewards** (`REWARDS` dict): win `+1.0`, fall `-1.0`, open gate `+0.1`, close gate `-0.1`, per-step `-0.01` (step reward and gate reward stack).
+- **Rewards** (`REWARDS` dict): win `+1.0`, fall `-1.0`, open gate `+0.1`, close gate `-0.1`, per-step `-0.01` (step reward and gate reward stack). The constructor's `rewards` arg (default `None`) merges over these module defaults, so any subset can be overridden per-env (stored as `self.rewards`); `Bloxorz-NoGate-v1` uses it for `{"win": 5.0, "fall": -5.0}`.
 - **Termination:** on win or fall. **Truncation:** after `max_steps` (constructor default `500`; the registered envs override via Gym's `max_episode_steps=100` wrapper). `info["final_info"]["solved"]` is set when the episode ends.
 - **`fall_terminates`** (constructor, default `True`): when `False`, an invalid move (off-board / void / closed gate) no longer terminates — the block stays in place and the `fall` reward (`-1.0`) is applied as a penalty. The episode then only ends on win or truncation.
 - **Gate state:** `_gate_open` toggles when the block stands `UPRIGHT` on `_switch_cell`.
@@ -64,10 +64,11 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 | ID | gate | grid | path_length | branch_tiles | notes |
 |----|------|------|-------------|--------------|-------|
 | `Bloxorz-v0` | True | 14×10 | 40 | 0 | |
-| `Bloxorz-NoGate-v0` | False | 10×10 | 40 | 20 | |
-| `Bloxorz-NoFall-v0` | False | 10×10 | 40 | 20 | `fall_terminates=False` — invalid moves penalize but don't end the episode |
+| `Bloxorz-NoGate-v0` | False | 10×10 | 30 | 20 | |
+| `Bloxorz-NoGate-v1` | False | 10×10 | 30 | 20 | `rewards={"win": 5.0, "fall": -5.0}` — larger terminal rewards |
+| `Bloxorz-NoFall-v0` | False | 10×10 | 30 | 50 | `fall_terminates=False` — invalid moves penalize but don't end the episode |
 
-Both register with `max_episode_steps=100`. Note the **registration kwargs differ from `BloxorzEnv.__init__` defaults** (18×14, `branch_tiles=40`, `max_steps=500`) — when constructing the env directly, pass explicit kwargs.
+All register with `max_episode_steps=100`. Note the **registration kwargs differ from `BloxorzEnv.__init__` defaults** (18×14, `branch_tiles=40`, `max_steps=500`) — when constructing the env directly, pass explicit kwargs.
 
 ```python
 import gymnasium as gym
