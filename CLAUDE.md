@@ -11,7 +11,7 @@ A [Gymnasium](https://gymnasium.farama.org/) reinforcement-learning environment 
 ```bash
 pip install -e .          # installs numpy, gymnasium, pygame
 bloxorz [--cols N] [--rows N] [--no-gate]   # console-script -> bloxorz.core:main
-python3 test_human.py     # human-playable harness driving the Gym env
+python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gym env
 ```
 
 | Flag | Default | Effect |
@@ -30,7 +30,7 @@ python3 test_human.py     # human-playable harness driving the Gym env
 - `bloxorz/env.py` — `BloxorzEnv(gym.Env)`. Wraps `core` logic, renders observations, and computes rewards.
 - `bloxorz/registration.py` — `gym.register(...)` calls for the two env IDs (imported for side effects).
 - `bloxorz/__init__.py` — re-exports `BloxorzEnv`, constants, and core functions; imports `registration` so `import bloxorz` registers the envs.
-- `test_human.py` — pygame harness that lets a human drive the registered env via `env.step()`.
+- `test_human.py` — pygame harness that lets a human drive the registered env via `env.step()`. `--record [DIR]` (default `frames/`) writes every observation to `DIR/<timestamp>/episode_NNN/frame_NNNN.png`; `S` still saves a single one-off PNG to the cwd.
 
 ## Core concepts (`core.py`)
 
