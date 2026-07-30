@@ -40,7 +40,7 @@ gym.register(
         "gate": False,
         "path_length": 30,
         "branch_tiles": 20,
-        "rewards": {"win": 5.0, "fall": -5.0},
+        "rewards": {"win": 10.0, "fall": -2.0},
         "render_mode": None,
     },
 )
