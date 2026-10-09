@@ -41,7 +41,7 @@ Four environments are registered:
 |----|------|------|-------------|--------------|-------|
 | `Bloxorz-v0` | Yes | 14×10 | 40 | 0 | |
 | `Bloxorz-NoGate-v0` | No | 10×10 | 30 | 20 | |
-| `Bloxorz-NoGate-v1` | No | 10×10 | 30 | 20 | Larger terminal rewards: +5 win, −5 fall |
+| `Bloxorz-NoGate-v1` | No | 10×10 | 30 | 20 | Larger terminal rewards: +10 win, −2 fall |
 | `Bloxorz-NoFall-v0` | No | 10×10 | 30 | 50 | Invalid moves penalize but don't end the episode |
 
 All four truncate at `max_episode_steps=100`.
@@ -78,7 +78,7 @@ RGB image of shape `(H, W, 3)` rendered in pure NumPy (no display required).
 | Gate closed (step on switch again) | −0.1 |
 | Step | −0.01 |
 
-Any subset of these can be overridden per-env with the `rewards` argument (e.g. `Bloxorz-NoGate-v1` uses `{"win": 5.0, "fall": -5.0}`):
+Any subset of these can be overridden per-env with the `rewards` argument (e.g. `Bloxorz-NoGate-v1` uses `{"win": 10.0, "fall": -2.0}`):
 
 ```python
 env = gym.make("Bloxorz-NoGate-v0", rewards={"win": 5.0, "fall": -5.0})
@@ -118,3 +118,44 @@ All arguments can be passed to `gym.make` or `BloxorzEnv` directly:
 ```python
 env = gym.make("Bloxorz-v0", grid_cols=20, grid_rows=14, branch_tiles=10)
 ```
+
+## JAX version (`bloxorz.jx`)
+
+A JAX port of the no-gate environments: level generation and dynamics are pure, jittable, vmappable functions, so a whole batch of environments (including generating fresh levels on reset) runs in one jitted call, or inside `jax.lax.scan`. Install with `pip install -e ".[jax]"`. JAX is only imported when you use `bloxorz.jx`.
+
+```python
+import gymnasium as gym
+import bloxorz  # registers the JAX ids too
+
+envs = gym.make_vec("JaxBloxorz-NoGate-v0", num_envs=1024)   # native batched env
+obs, info = envs.reset(seed=0)                                # (1024, 96, 96, 3) uint8
+obs, reward, terminated, truncated, info = envs.step(envs.action_space.sample())
+```
+
+| ID | Matches | Notes |
+|----|---------|-------|
+| `JaxBloxorz-NoGate-v0` | `Bloxorz-NoGate-v0` | |
+| `JaxBloxorz-NoGate-v1` | `Bloxorz-NoGate-v1` | +10 win, −2 fall |
+| `JaxBloxorz-NoFall-v0` | `Bloxorz-NoFall-v0` | `fall_terminates=False` |
+
+`gym.make(id)` gives the single-env `BloxorzGymEnv`. Episodes truncate at `max_steps=100` inside the env (there is no `TimeLimit` wrapper). The vector env uses Gymnasium's `NEXT_STEP` autoreset by default; pass `autoreset_mode=` for `SAME_STEP` or `DISABLED`, and `jax_output=True` to keep outputs on the device.
+
+For a fully on-device training loop, use the functional env directly:
+
+```python
+import jax
+from bloxorz import jx
+
+env = jx.Bloxorz(reward_win=10.0)               # any GenParams/EnvParams field by name
+obs, state = jax.vmap(env.reset)(jax.random.split(jax.random.key(0), 1024))
+obs, state, reward, terminated, truncated, info = jax.vmap(env.step_autoreset)(
+    jax.random.split(jax.random.key(1), 1024), state, actions)
+```
+
+`step_autoreset` returns the next episode's first observation when an episode ends. The episode that ended is in `info["final_obs"]`, `info["final_info"]` (`episode_return`, `time`, `solved`) and `info["final_state"]`.
+
+**Same game, same levels distribution.** Rules, rewards and the RGB observation are identical to `BloxorzEnv(gate=False)`. The tests replay random play on the same boards through both envs and compare every reward, done flag and pixel. The generator is the same reverse walk plus branch fill, so every level is solvable (the tests BFS-check them). The same seed does not give the same level as the NumPy env, because the RNGs differ. `obs_mode="planes"` gives a compact float32 `(12, 12, 3)` observation (tile / goal / block planes) instead of the image.
+
+On a laptop CPU, the batched env runs at roughly 200k steps/s with RGB observations in `lax.scan` and 360k with `planes` (the NumPy env runs at about 9k). Most of that time is spent generating levels for autoreset.
+
+Run the tests with `pip install -e ".[dev]" && pytest`.

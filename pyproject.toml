@@ -12,8 +12,16 @@ dependencies = [
     "pygame",
 ]
 
+[project.optional-dependencies]
+# The JAX port in bloxorz.jx; the NumPy env and the pygame game need none of it.
+jax = ["jax>=0.4.30"]
+dev = ["jax>=0.4.30", "pytest>=7", "pillow"]
+
 [project.scripts]
 bloxorz = "bloxorz.core:main"
 
 [tool.setuptools]
-packages = ["bloxorz"]
+packages = ["bloxorz", "bloxorz.jx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

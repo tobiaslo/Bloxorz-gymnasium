@@ -30,6 +30,8 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 - `bloxorz/env.py` — `BloxorzEnv(gym.Env)`. Wraps `core` logic, renders observations, and computes rewards.
 - `bloxorz/registration.py` — `gym.register(...)` calls for the two env IDs (imported for side effects).
 - `bloxorz/__init__.py` — re-exports `BloxorzEnv`, constants, and core functions; imports `registration` so `import bloxorz` registers the envs.
+- `bloxorz/jx/` — JAX port of the **no-gate** env (see below). Only imported on demand, so the rest of the package does not need JAX.
+- `tests/test_jx.py` — checks the JAX port against the NumPy env (transitions, pixels, solvability, level statistics). `pytest` from the repo root.
 - `test_human.py` — pygame harness that lets a human drive the registered env via `env.step()`. `--record [DIR]` (default `frames/`) writes every observation to `DIR/<timestamp>/episode_NNN/frame_NNNN.png`; `S` still saves a single one-off PNG to the cwd.
 
 ## Core concepts (`core.py`)
@@ -38,7 +40,7 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 
 **Board** is a 2D list indexed `board[row][col]` of ints: `0` = void, `1` = tile, `2` = goal, `3` = gate/bridge tile, `4` = switch. `is_win()` requires the block to arrive `UPRIGHT` on a goal cell.
 
-**Padding:** the playable `grid_cols × grid_rows` area sits inside a `BOARD_PAD` (=2) void border, so the actual board array is `(grid_cols + 2*BOARD_PAD) × (grid_rows + 2*BOARD_PAD)`. The pad gives the block room to roll off the edge and "fall."
+**Padding:** the playable `grid_cols × grid_rows` area sits inside a `BOARD_PAD` (=1) void border, so the actual board array is `(grid_cols + 2*BOARD_PAD) × (grid_rows + 2*BOARD_PAD)`. The pad gives the block room to roll off the edge and "fall."
 
 **Move logic** (`move()`) encodes the full roll table mapping `(ori, direction)` → `(new_col, new_row, new_ori)`. Position delta depends on orientation — e.g. rolling right from `UPRIGHT` moves +1 col and becomes `FLAT_H`, but rolling right from `FLAT_H` moves +2 col and becomes `UPRIGHT`. Directions are `(1,0)=right, (-1,0)=left, (0,1)=down, (0,-1)=up`.
 
@@ -53,7 +55,7 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 
 - **Action space:** `Discrete(4)` — `0=right, 1=left, 2=down, 3=up` (`ACTIONS` list).
 - **Observation space:** `Box(0,255, (H, W, 3), uint8)` RGB image, drawn in `_obs()` with NumPy slicing (no pygame surface needed). Image size derives from grid + `BOARD_PAD` + `MARGIN`.
-- **Rewards** (`REWARDS` dict): win `+1.0`, fall `-1.0`, open gate `+0.1`, close gate `-0.1`, per-step `-0.01` (step reward and gate reward stack). The constructor's `rewards` arg (default `None`) merges over these module defaults, so any subset can be overridden per-env (stored as `self.rewards`); `Bloxorz-NoGate-v1` uses it for `{"win": 5.0, "fall": -5.0}`.
+- **Rewards** (`REWARDS` dict): win `+1.0`, fall `-1.0`, open gate `+0.1`, close gate `-0.1`, per-step `-0.01` (step reward and gate reward stack). The constructor's `rewards` arg (default `None`) merges over these module defaults, so any subset can be overridden per-env (stored as `self.rewards`); `Bloxorz-NoGate-v1` uses it for `{"win": 10.0, "fall": -2.0}`.
 - **Termination:** on win or fall. **Truncation:** after `max_steps` (constructor default `500`; the registered envs override via Gym's `max_episode_steps=100` wrapper). `info["final_info"]["solved"]` is set when the episode ends.
 - **`fall_terminates`** (constructor, default `True`): when `False`, an invalid move (off-board / void / closed gate) no longer terminates — the block stays in place and the `fall` reward (`-1.0`) is applied as a penalty. The episode then only ends on win or truncation.
 - **Gate state:** `_gate_open` toggles when the block stands `UPRIGHT` on `_switch_cell`.
@@ -65,7 +67,7 @@ python3 test_human.py [--record [DIR]]   # human-playable harness driving the Gy
 |----|------|------|-------------|--------------|-------|
 | `Bloxorz-v0` | True | 14×10 | 40 | 0 | |
 | `Bloxorz-NoGate-v0` | False | 10×10 | 30 | 20 | |
-| `Bloxorz-NoGate-v1` | False | 10×10 | 30 | 20 | `rewards={"win": 5.0, "fall": -5.0}` — larger terminal rewards |
+| `Bloxorz-NoGate-v1` | False | 10×10 | 30 | 20 | `rewards={"win": 10.0, "fall": -2.0}` — larger terminal rewards |
 | `Bloxorz-NoFall-v0` | False | 10×10 | 30 | 50 | `fall_terminates=False` — invalid moves penalize but don't end the episode |
 
 All register with `max_episode_steps=100`. Note the **registration kwargs differ from `BloxorzEnv.__init__` defaults** (18×14, `branch_tiles=40`, `max_steps=500`) — when constructing the env directly, pass explicit kwargs.
@@ -78,8 +80,19 @@ obs, info = env.reset(seed=0)
 obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 ```
 
+## JAX port (`bloxorz/jx/`)
+
+Modeled on `../jaxoban`. Only `gate=False` is ported. Layers:
+
+- `rules.py` — `MOVES[ori, action] = (dcol, drow, new_ori)` **built from `core.move`**, plus `roll`/`fits`/`stamp` helpers. Block is an `int32[3]` `(col, row, ori)`.
+- `generate.py` — `generate_level(key, GenParams)` → `Level(board uint8[H,W], start int32[3])`. Same algorithm as `core.generate_board(gate=False)`, with both loops as `lax.scan`. Random numbers are drawn up front, one RNG call per stage, because per-iteration RNG dominated the cost on CPU. Same distribution as NumPy, but different levels for the same seed.
+- `env.py` — pure `step(state, action, EnvParams)`, `EnvState(board, block, time, episode_return)`, and the functional `Bloxorz` class (`reset`/`step`/`step_autoreset`, jitted with `self` static). Overrides accept any `GenParams`/`EnvParams` field by name. `EnvParams.max_steps=100` replaces the `TimeLimit` wrapper.
+- `render.py` — `render_rgb` reproduces `BloxorzEnv._obs` **pixel for pixel**. This is a third parallel renderer to keep in sync.
+- `gym_api.py` — `BloxorzVectorEnv` (`gymnasium.vector.VectorEnv`, `NEXT_STEP`/`SAME_STEP`/`DISABLED` autoreset) and the single-env `BloxorzGymEnv`.
+- Registered in `registration.py` as `JaxBloxorz-NoGate-v0`, `JaxBloxorz-NoGate-v1`, `JaxBloxorz-NoFall-v0` with string entry points (so no JAX import). Both `gym.make` and `gym.make_vec` work.
+
 ## Gotchas
 
-- Keep `core.py` the single source of truth: `env.py`'s `_obs`/`_render_*` and `core.py`'s `draw_board`/`draw_block` are parallel renderers of the same board — changes to cell colors or block geometry must stay in sync between them.
+- Keep `core.py` the single source of truth: `env.py`'s `_obs`/`_render_*`, `jx/render.py`, and `core.py`'s `draw_board`/`draw_block` are parallel renderers of the same board — changes to cell colors or block geometry must stay in sync between them.
 - Board indexing is `board[row][col]`, but block state and most function signatures are `(col, row)` order. Don't transpose by accident.
 - `core.main()` (the `bloxorz` CLI) is the standalone pygame game and does **not** go through `BloxorzEnv`; it has its own game loop.
